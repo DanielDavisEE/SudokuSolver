@@ -153,45 +153,52 @@ class Sudoku:
         self.log.debug(self.original_puzzle)
         self.puzzle = self.original_puzzle.copy()
 
-    def neighbours(self, i, j, verbose=False):
-        """ Find the neighbouring cells for a chosen cell on a Sudoku board.
-            Yield a generator of each value in the neighbours.
+    def neighbours(self, row: int, col: int):
         """
-        for j_tmp, cell in enumerate(self[i]):
-            if j_tmp != j:
-                yield (cell, i, j_tmp) if verbose else tuple(cell)
-        for i_tmp, row in enumerate(self):
-            if i_tmp != i:
-                yield (row[j], i_tmp, j) if verbose else tuple(row[j])
+        Find the neighbouring cells for a chosen cell on a Sudoku board.
+            Yield a generator of each value in the neighbours.
 
-        x, y = (i // 3) * 3, (j // 3) * 3
-        tmp_x, tmp_y = 0, 0
+        Args:
+            row: The row coordinate
+            col: The column coordinate
 
-        for _ in range(9):
+        Yields:
+            tuple[int, int], int: A row, col coordinate tuple and the value at those coordinates
+        """
+        # Iterate down the column
+        for _row in range(9):
+            if _row != row:
+                yield (_row, col), self[_row][col]
 
-            if i != x + tmp_x or j != y + tmp_y:
-                i_tmp, j_tmp = x + tmp_x, y + tmp_y
-                yield (self[i_tmp][j_tmp], i_tmp, j_tmp) if verbose else tuple(self[i_tmp][j_tmp])
+        # Iterate across the row
+        for _col in range(9):
+            if _col != col:
+                yield (row, _col), self[row][_col]
 
-            tmp_x += 1
+        # Iterate through the 3x3 box
+        box_row_origin, box_col_origin = (row // 3) * 3, (col // 3) * 3
+        for row_diff in range(3):
+            for col_diff in range(3):
+                _row, _col = box_row_origin + row_diff, box_col_origin + col_diff
+                if (_row, _col) == (row, col):
+                    continue
 
-            if tmp_x % 3 == 0:
-                tmp_y += 1
-                tmp_x = 0
+                yield (_row, _col), self[_row][_col]
 
-    def solve_puzzle(self, alg='Fast'):
-        if type(alg) is not str:
-            raise TypeError("alg is either 'slow' or 'fast'")
+    def solve_puzzle(self, alg: str = None):
+        if alg is None:
+            alg = 'fast'
 
-        if alg.lower() == 'fast':
-            self.solve_puzzle_fast()
-        elif alg.lower() == 'slow':
-            self.solve_puzzle_slow()
-        else:
-            raise ValueError("alg is either 'slow' or 'fast'")
+        if alg not in ['slow', 'fast']:
+            raise ValueError("'alg' is either 'slow' or 'fast'")
+
+        alg_function = {
+            'fast': self.solve_puzzle_fast,
+            'slow': self.solve_puzzle_slow}[alg]
+        alg_function()
 
     def _remove_rows(self, k, permanent=False):
-        """ Remove all rows which satisfy a constraint also satfisfied by k 
+        """ Remove all rows which satisfy a constraint also satisfied by k
         """
         self[k[1]][k[2]] = str(k[0])
         if not permanent:
@@ -309,7 +316,7 @@ class Sudoku:
 
         for cell_index in range(cell_count):
             for possibility in range(1, 10):
-                # Each cell contains two bools, refering to the status re the
+                # Each cell contains two bools, referring to the status re the
                 #     constraint and its visibility
                 k = (possibility, cell_index // 9, cell_index % 9)  # Define matrix keys
 
@@ -329,7 +336,7 @@ class Sudoku:
                 matrix[k] = tuple(matrix[k])
 
                 # Visibility of each constraint matrix row, defaults to True
-                #    and which other key they where eliminated by
+                #    and which other key they were eliminated by
                 rows_info[k] = True, None
 
         return constraints_info, rows_info, matrix
@@ -358,7 +365,7 @@ class Sudoku:
                 self._remove_rows((int(value), i, j), permanent=True)
 
         # for row in self.constraints_matrix.keys():
-            # self.log.debug(f"{row} ({self.rows_info[row]}): {self.constraints_matrix[row]}")
+        # self.log.debug(f"{row} ({self.rows_info[row]}): {self.constraints_matrix[row]}")
 
     def solve_puzzle_fast_step(self, generateRandom=False):
         """A dancing links algoritm for solving a sudoku puzzle
