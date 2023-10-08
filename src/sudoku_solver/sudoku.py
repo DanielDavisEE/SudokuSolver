@@ -1,6 +1,8 @@
 from copy import deepcopy
 import random
-from sudoku_gui import Board as BoardGUI
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 class Board:
@@ -22,7 +24,7 @@ class Board:
         self.board[i] = val
 
     def __hash__(self):
-        return hash(''.join([''.join(row) for row in self.board]))
+        return hash(repr(self))
 
     def __repr__(self):
         return ''.join([''.join(row) for row in self.board])
@@ -44,15 +46,11 @@ class Board:
         return Board(deepcopy(self.board))
 
 
-class Sudoku():
-    def __init__(self, game_gui=None, puzzle=None, isMain=False):
-        if isMain:
-            self.game_gui = game_gui
-            if self.game_gui is None:
-                self.game_gui = BoardGUI()
-        self.isMain = isMain
-
+class Sudoku:
+    def __init__(self, puzzle=None):
+        self.log = logging.getLogger()
         self.solutions = set()
+        self.action_list = []
 
         if puzzle is None:
             for _ in self.generate_puzzle():  # self.generate_puzzle is a generator
@@ -71,38 +69,25 @@ class Sudoku():
     def __str__(self):
         return self.original_puzzle.__str__()
 
-    def generate_solved_puzzle(self):
+    def create_solved_puzzle(self):
         # Create blank board
-        self.original_puzzle = Board([[' ' for _ in range(9)] for _ in range(9)])
+        puzzle = Board()
+
         # Randomly fill in the first layer
-        options = list(range(1, 10))
-        for i in range(len(self.original_puzzle[0])):
-            num_choice = random.choice(options)
-            options.remove(num_choice)
-            self.original_puzzle[0][i] = str(num_choice)
-            if self.isMain:
-                self.game_gui.set_value(0, i, num_choice)
-            else:
-                yield 0, i, num_choice
+        puzzle[0] = list(range(1, 10))
+        random.shuffle(puzzle[0])
 
         # Fill in the rest of the board
-        self.solve_puzzle_fast_init()
+        self.solve_puzzle_fast_init(puzzle)
+
         solving = True
         while solving:
-
             solving, move = self.solve_puzzle_fast_step(generateRandom=True)
 
-            if self.isMain:
-                # GUI update code
-                pygame.time.delay(20)
-                if move is not None:
-                    value, row, col = move
-                    self.game_gui.set_value(row, col, value)
-                self.game_gui.draw_board()
-            else:
-                yield row, col, value
+            value, row, col = move
+            puzzle[row][col] = value
 
-        self.original_puzzle = self.puzzle.copy()
+        return puzzle
 
     def multiple_solutions(self):
         solving = True
@@ -110,22 +95,22 @@ class Sudoku():
             solving, move = self.solve_puzzle_fast_step()
             print(solving, move)
 
-        print('Number of Solutions Found:', len(self.solutions))
-        [print(x.__repr__()) for x in self.solutions]
+        self.log.debug('Number of Solutions Found:', len(self.solutions))
+        # [print(x.__repr__()) for x in self.solutions]
         self.action_list = []
         return len(self.solutions) == 1
 
     def generate_puzzle(self):
-        for _ in self.generate_solved_puzzle():
-            pass
-        print('Solved Puzzle:')
-        print(self.original_puzzle)
+        puzzle_solution = self.create_solved_puzzle()
+
+        self.log.debug('Solved Puzzle:')
+        self.log.debug(puzzle_solution)
 
         # Remove random numbers from the board until a puzzle with multiple solutions
         #    is generated.
         i = 0
         self.solve_puzzle_fast_init()
-        print('entering loop')
+        self.log.debug('entering loop')
         while self.multiple_solutions() and i < 81:
             random_row, random_col = random.randint(0, 8), random.randint(0, 8)
             old_num = self.original_puzzle[random_row][random_col]
@@ -136,16 +121,16 @@ class Sudoku():
 
             # self.original_puzzle[random_row][random_col] = ' '
             key = (int(old_num), random_row, random_col)
-            print(key)
+            self.log.debug(key)
 
             # for row in self.rows_info.keys():
             # self.rows_info[row] = self.rows_info[row][0], None
             # for i, row in enumerate(self.constraints_info):
             # if key in row[2] or key in row[3]:
             # print(i, row)
-            print(i)
+            self.log.debug(i)
             self.back_step(permanent=True, sub_key=(int(old_num), random_row, random_col))
-            print(self.original_puzzle)
+            self.log.debug(self.original_puzzle)
             # if i == 0:
             # print(self.original_puzzle)
             # a1, b1, c1 = self.constraints_matrix, self.rows_info, self.constraints_info
@@ -156,27 +141,16 @@ class Sudoku():
             # for k, v in b1.items():
             # print(k, v)
             i += 1
-            if self.isMain:
-                # GUI update code
-                pygame.time.delay(20)
-                self.game_gui.set_value(random_row, random_col, ' ')
-                self.game_gui.draw_board()
-            else:
-                yield random_row, random_col, ' '
-        print('Left loop')
+            yield random_row, random_col, ' '
+        self.log.debug('Left loop')
 
         # Replace the most recently removed number
         self.original_puzzle[random_row][random_col] = old_num
 
-        if self.isMain:
-            # GUI update code        
-            self.game_gui.set_value(random_row, random_col, old_num)
-            self.game_gui.draw_board()
-        else:
-            yield random_row, random_col, old_num
+        yield random_row, random_col, old_num
 
-        print('Finished Puzzle:')
-        print(self.original_puzzle)
+        self.log.debug('Finished Puzzle:')
+        self.log.debug(self.original_puzzle)
         self.puzzle = self.original_puzzle.copy()
 
     def neighbours(self, i, j, verbose=False):
@@ -308,7 +282,7 @@ class Sudoku():
         # Reset the status of the child actions
         for child in children:
             if permanent:
-                print("How'd I get here?", child)
+                self.log.debug("How'd I get here?", child)
             row_child = self.constraints_matrix[child]
 
             self.rows_info[child] = True, None
@@ -324,54 +298,54 @@ class Sudoku():
 
         return True, (' ', row, col)
 
+    def _create_constraints_matrix(self, cell_count=81, constraints_count=324):
+
+        # constraints matrix which defines which constraints each row fulfills
+        matrix = {}
+        # Visibility, number of rows which satisfy constraint, rows which satisfy constraint
+        constraints_info = [[True, 0, set(), set()] for _ in range(constraints_count)]
+        # Visibility of rows
+        rows_info = {}
+
+        for cell_index in range(cell_count):
+            for possibility in range(1, 10):
+                # Each cell contains two bools, refering to the status re the
+                #     constraint and its visibility
+                k = (possibility, cell_index // 9, cell_index % 9)  # Define matrix keys
+
+                # Define constraint details for each key
+                constraints_satisfied = [
+                    k[1] * 9 + k[2],
+                    k[1] * 9 + (k[0] - 1) + cell_count * 1,
+                    k[2] * 9 + (k[0] - 1) + cell_count * 2,
+                    ((k[1] // 3) * 3 + k[2] // 3) * 9 + (k[0] - 1) + cell_count * 3
+                ]
+
+                matrix[k] = [False for _ in range(constraints_count)]
+                for c in constraints_satisfied:
+                    matrix[k][c] = True
+                    constraints_info[c][1] += 1
+                    constraints_info[c][2].add(k)
+                matrix[k] = tuple(matrix[k])
+
+                # Visibility of each constraint matrix row, defaults to True
+                #    and which other key they where eliminated by
+                rows_info[k] = True, None
+
+        return constraints_info, rows_info, matrix
+
     def solve_puzzle_fast_init(self):
-        def generate_constraints_matrix(cell_count=81, constraints_count=324):
-
-            # constraints matrix which defines which constraints each row fulfills
-            matrix = {}
-            # Visibility, number of rows which satisfy constraint, rows which satisfy constraint
-            constraints_info = [[True, 0, set(), set()] for _ in range(constraints_count)]
-            # Visibility of rows
-            rows_info = {}
-
-            for cell_index in range(cell_count):
-                for possibility in range(1, 10):
-                    # Each cell contains two bools, refering to the status re the 
-                    #     constraint and its visibility
-                    k = (possibility, cell_index // 9, cell_index % 9)  # Define matrix keys
-
-                    # Define constraint details for each key
-                    constraints_satisfied = [
-                        k[1] * 9 + k[2],
-                        k[1] * 9 + (k[0] - 1) + cell_count * 1,
-                        k[2] * 9 + (k[0] - 1) + cell_count * 2,
-                        ((k[1] // 3) * 3 + k[2] // 3) * 9 + (k[0] - 1) + cell_count * 3
-                    ]
-
-                    matrix[k] = [False for _ in range(constraints_count)]
-                    for c in constraints_satisfied:
-                        matrix[k][c] = True
-                        constraints_info[c][1] += 1
-                        constraints_info[c][2].add(k)
-                    matrix[k] = tuple(matrix[k])
-
-                    # Visibility of each constraint matrix row, defaults to True
-                    #    and which other key they where eliminated by
-                    rows_info[k] = True, None
-
-            return constraints_info, rows_info, matrix
-
         # Create global data
         self.puzzle = self.original_puzzle.copy()
         self.solutions = set()
         self.action_list = []  # Stores info about past actions
-        self.constraints_info, self.rows_info, self.constraints_matrix = generate_constraints_matrix()
-        self.best_constraints, self.best_actions = [], []  # Stores persistant info about future actions
+        self.constraints_info, self.rows_info, self.constraints_matrix = self._create_constraints_matrix()
+        self.best_constraints, self.best_actions = [], []  # Stores persistent info about future actions
 
-        # Print global data
-        # print('constraints_info:', self.constraints_info)
-        # print('rows_info:', self.rows_info)
-        # print('constraints_matrix:', self.constraints_matrix)
+        # log global data
+        # self.log.debug('constraints_info:', self.constraints_info)
+        # self.log.debug('rows_info:', self.rows_info)
+        # self.log.debug('constraints_matrix:', self.constraints_matrix)
 
         # Input preset values
         for i, row in enumerate(self.puzzle):
@@ -380,14 +354,11 @@ class Sudoku():
                 if value == ' ':
                     continue
 
-                # print(f"Coords: ({i}, {j}). Value: {int(value)}")
+                # self.log.debug(f"Coords: ({i}, {j}). Value: {int(value)}")
                 self._remove_rows((int(value), i, j), permanent=True)
-                # self.game_gui.set_value(i, j, value)
-        # print()
 
         # for row in self.constraints_matrix.keys():
-        # print(f"{row} ({self.rows_info[row]}): {self.constraints_matrix[row]}")
-        # print()
+            # self.log.debug(f"{row} ({self.rows_info[row]}): {self.constraints_matrix[row]}")
 
     def solve_puzzle_fast_step(self, generateRandom=False):
         """A dancing links algoritm for solving a sudoku puzzle
@@ -399,7 +370,7 @@ class Sudoku():
         rows_info = self.rows_info
 
         record = sum(c[0] for c in constraints_info)
-        # print(f"Available constraint options: {record}")
+        # self.log.debug(f"Available constraint options: {record}")
 
         best_constraints = self.best_constraints
 
@@ -412,7 +383,7 @@ class Sudoku():
                 best_constraints = [visible_constraints[0]]
             else:
                 # If no constraints are available then the puzzle is solved
-                # print('Solution found')
+                # self.log.debug('Solution found')
                 self.solutions.add(self.puzzle.copy())
 
                 if generateRandom:
@@ -437,10 +408,10 @@ class Sudoku():
             if constraints_info[best_constraint][1] != 0:
                 best_actions = list(constraints_info[best_constraint][2])
             else:
-                # print("Can't find viable option.")
+                # self.log.debug("Can't find viable option.")
                 optionsAvailable, move = self.back_step()
                 if not optionsAvailable:
-                    # print('No more solutions available.')
+                    # self.log.debug('No more solutions available.')
                     return optionsAvailable, move
 
         if best_actions:
@@ -458,17 +429,15 @@ class Sudoku():
         return True, move
 
     def solve_puzzle_slow(self):
-        """A bactracking algoritm for solving a sudoku puzzle
+        """A bactracking algorithm for solving a sudoku puzzle
         """
-
-        puzzle = self.puzzle
 
         # count = 0
         # for row in self.puzzle:
         # for cell in row:
         # if cell == ' ':
         # count += 1
-        # print(count)
+        # self.log.debug(count)
 
         def check_validity(self, i, j, val):
             for cell in self.neighbours(i, j):
@@ -477,20 +446,20 @@ class Sudoku():
             return True
 
         finished = True
-        for i, row in enumerate(puzzle):
+        for i, row in enumerate(self.puzzle):
             for j, col in enumerate(row):
-                tile = puzzle[i][j]
+                tile = self.puzzle[i][j]
                 if tile == ' ':
-                    # print(i, j)
+                    # self.log.debug(i, j)
                     finished = False
                     for x in range(1, 10):
                         if check_validity(self, i, j, str(x)):
-                            # print('\t', str(x))
-                            puzzle[i][j] = str(x)
+                            # self.log.debug('\t', str(x))
+                            self.puzzle[i][j] = str(x)
                             self.solve_puzzle_slow()
-                            puzzle[i][j] = ' '
+                            self.puzzle[i][j] = ' '
         if finished:
-            print(puzzle)
+            self.log.debug(self.puzzle)
 
 
 if __name__ == '__main__':
