@@ -1,6 +1,6 @@
 import pygame
 from pygame.locals import *
-import myStorage
+import utils
 
 BASE_UNIT = 20
 TILE_DIM = 2

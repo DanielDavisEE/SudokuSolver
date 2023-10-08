@@ -1,14 +1,16 @@
 from copy import deepcopy
-import pygame, sys, random
-from pygame.locals import *
-from SudokuGUI import Board as BoardGUI
+import random
+from sudoku_gui import Board as BoardGUI
 
 
 class Board:
-    def __init__(self, board):
-        if type(board) is list:
+    def __init__(self, board: list | str = None):
+        if board is None:
+            board = ' ' * 9 * 9
+
+        if isinstance(board, list):
             self.board = board
-        elif type(board) is str:
+        elif isinstance(board, str):
             self.board = []
             for i in range(9):
                 self.board.append(list(board[i * 9:(i + 1) * 9]))
@@ -26,21 +28,17 @@ class Board:
         return ''.join([''.join(row) for row in self.board])
 
     def __str__(self):
+        h_line = f"+{'-' * 23}+\n"
+        row_template = "| {} {} {} | {} {} {} | {} {} {} |\n"
 
         puzzle_str = ''
-        h_line = f".{'-' * 23}.\n"
-
         for i, line in enumerate(self.board):
             if i % 3 == 0:
                 puzzle_str += h_line
-            for j, n in enumerate(line):
-                if j % 3 == 0:
-                    puzzle_str += '| '
-                puzzle_str += n + ' '
-            puzzle_str += '|\n'
 
-        puzzle_str += h_line
-        return puzzle_str
+            puzzle_str += row_template.format(*line)
+
+        return puzzle_str + h_line
 
     def copy(self):
         return Board(deepcopy(self.board))
@@ -496,89 +494,4 @@ class Sudoku():
 
 
 if __name__ == '__main__':
-    import SudokuGUI as GUI
-
-    ex1 = [
-        ['5', '3', ' ', ' ', '7', ' ', ' ', ' ', ' '],
-        ['6', ' ', ' ', '1', '9', '5', ' ', ' ', ' '],
-        [' ', '9', '8', ' ', ' ', ' ', ' ', '6', ' '],
-        ['8', ' ', ' ', ' ', '6', ' ', ' ', ' ', '3'],
-        ['4', ' ', ' ', '8', ' ', '3', ' ', ' ', '1'],
-        ['7', ' ', ' ', ' ', '2', ' ', ' ', ' ', '6'],
-        [' ', '6', ' ', ' ', ' ', ' ', '2', '8', ' '],
-        [' ', ' ', ' ', '4', '1', '9', ' ', ' ', '5'],
-        [' ', ' ', ' ', ' ', '8', ' ', ' ', '7', '9']
-    ]
-    ex2 = [
-        [' ', ' ', '6', '3', ' ', ' ', ' ', '7', ' '],
-        [' ', ' ', '1', '7', ' ', ' ', '3', ' ', '9'],
-        [' ', ' ', ' ', ' ', '9', ' ', '2', ' ', ' '],
-        [' ', ' ', ' ', ' ', ' ', ' ', ' ', '1', ' '],
-        [' ', ' ', ' ', '9', ' ', ' ', ' ', ' ', '7'],
-        [' ', '9', '7', ' ', '5', ' ', ' ', ' ', ' '],
-        [' ', '8', ' ', ' ', ' ', ' ', ' ', ' ', ' '],
-        [' ', '3', ' ', ' ', '6', '2', '5', ' ', ' '],
-        [' ', '1', ' ', ' ', ' ', '8', ' ', '6', ' ']
-    ]
-    ex3 = [
-        [' ', '1', '3', ' ', ' ', '7', ' ', ' ', '6'],
-        [' ', ' ', ' ', ' ', ' ', ' ', ' ', '2', '4'],
-        [' ', '5', ' ', '8', ' ', ' ', ' ', '7', ' '],
-        [' ', ' ', ' ', '9', ' ', '8', '7', ' ', ' '],
-        ['4', '7', ' ', ' ', ' ', ' ', ' ', '5', ' '],
-        ['5', ' ', ' ', '6', '7', ' ', ' ', ' ', ' '],
-        [' ', ' ', ' ', ' ', ' ', ' ', '9', ' ', '2'],
-        ['7', ' ', '6', ' ', '3', ' ', '8', ' ', ' '],
-        [' ', ' ', '1', ' ', '2', ' ', ' ', ' ', ' ']
-    ]
-    ex4 = [
-        ['4', ' ', ' ', '8', ' ', '5', ' ', ' ', '9'],
-        [' ', ' ', '5', ' ', ' ', ' ', ' ', '8', '6'],
-        [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '],
-        [' ', '7', ' ', ' ', ' ', '9', '5', ' ', ' '],
-        ['3', ' ', ' ', ' ', '5', ' ', ' ', ' ', ' '],
-        [' ', ' ', '6', ' ', '7', ' ', '1', ' ', ' '],
-        [' ', '3', ' ', ' ', ' ', ' ', ' ', ' ', '4'],
-        ['5', ' ', ' ', ' ', '3', '7', '2', ' ', ' '],
-        [' ', '6', ' ', '9', ' ', ' ', ' ', ' ', ' ']
-    ]
-
-    pygame.key.set_repeat(1000, 100)
-
-    game_gui = BoardGUI()
-    game_inst = Sudoku(game_gui=game_gui, puzzle=ex4, isMain=True)  # , puzzle=ex4)
-
-    game_inst.solve_puzzle_fast_init()
-
-    running, solving, solved = True, True, False
-
-    game_gui.draw_board()
-
-    while running:
-        pygame.time.delay(10)
-        for event in pygame.event.get():
-            if event.type == KEYDOWN and event.key == K_ESCAPE:
-                running = False
-            if event.type == pygame.QUIT:
-                running = False
-
-        if solving:
-            solving, move = game_inst.solve_puzzle_fast_step()
-            if move is not None:
-                value, row, col = move
-                game_inst.game_gui.set_value(row, col, value)
-                print(move)
-                # print(game_inst.puzzle)
-            if not solving:
-                solved = True
-
-        if solved:
-            solved = False
-            print(f"{'-' * 20} Solutions {'-' * 20}")
-            for solution in game_inst.solutions:
-                print(f"New Solution:")
-                print(solution)
-
-        game_gui.draw_board()
-
-    pygame.quit()
+    sudoku_inst = Sudoku()
