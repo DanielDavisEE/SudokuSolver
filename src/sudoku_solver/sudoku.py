@@ -1,9 +1,12 @@
+from dataclasses import dataclass
+
 import numpy as np
 import random
 import logging
 from abc import ABC, abstractmethod
 
 logging.basicConfig(level=logging.DEBUG)
+
 
 
 class SudokuSolver(ABC):
@@ -32,24 +35,24 @@ class SudokuSolver(ABC):
             tuple[int, int], int: A row, col coordinate tuple and the value at those coordinates
         """
         # Iterate down the column
-        for _row in range(9):
+        for _row in range(Sudoku.HEIGHT):
             if _row != row:
-                yield (_row, col), self[_row][col]
+                yield (_row, col), self._puzzle[_row][col]
 
         # Iterate across the row
-        for _col in range(9):
+        for _col in range(Sudoku.WIDTH):
             if _col != col:
-                yield (row, _col), self[row][_col]
+                yield (row, _col), self._puzzle[row][_col]
 
         # Iterate through the 3x3 box
-        box_row_origin, box_col_origin = (row // 3) * 3, (col // 3) * 3
-        for row_diff in range(3):
-            for col_diff in range(3):
+        box_row_origin, box_col_origin = Sudoku.get_box_origin(row, col)
+        for row_diff in range(Sudoku.BOX_HEIGHT):
+            for col_diff in range(Sudoku.BOX_WIDTH):
                 _row, _col = box_row_origin + row_diff, box_col_origin + col_diff
                 if (_row, _col) == (row, col):
                     continue
 
-                yield (_row, _col), self[_row][_col]
+                yield (_row, _col), self._puzzle[_row][_col]
 
 
 class BacktrackSudokuSolver(SudokuSolver):
@@ -344,11 +347,34 @@ class DancingChainsSudokuSolver(SudokuSolver):
 
 
 class Sudoku:
+    WIDTH = 9
+    HEIGHT = 9
+    SHAPE = (WIDTH, HEIGHT)
+    N_CELLS = WIDTH * HEIGHT
+
+    BOX_WIDTH = 3
+    BOX_HEIGHT = 3
+    BOX_SHAPE = (BOX_WIDTH, BOX_HEIGHT)
+    BOX_N_CELLS = BOX_WIDTH * BOX_HEIGHT
+
     def __init__(self, puzzle=None):
         self.log = logging.getLogger()
 
         self.puzzle: np.array | None = self._interpret_puzzle_repr(puzzle)
         self.solver = BacktrackSudokuSolver()
+
+    @staticmethod
+    def get_box_origin(row: int, col: int) -> tuple[int, int]:
+        """Get the coordinates of the box which contains the input cell
+
+        Args:
+            row: The row coordinate of a cell
+            col: The col coordinate of a cell
+
+        Returns:
+            The row, col coordinates of the top left corner of the box
+        """
+        return (row // 3) * 3, (col // 3) * 3
 
     @staticmethod
     def _interpret_puzzle_repr(puzzle: str | list | None):
