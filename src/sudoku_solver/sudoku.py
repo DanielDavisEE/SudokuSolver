@@ -1,159 +1,25 @@
-from copy import deepcopy
+import numpy as np
 import random
 import logging
+from abc import ABC, abstractmethod
 
 logging.basicConfig(level=logging.DEBUG)
 
 
-class Board:
-    def __init__(self, board: list | str = None):
-        if board is None:
-            board = ' ' * 9 * 9
+class SudokuSolver(ABC):
+    def __init__(self):
+        self.log = logging.getLogger(self.__class__.__name__)
 
-        if isinstance(board, list):
-            self.board = board
-        elif isinstance(board, str):
-            self.board = []
-            for i in range(9):
-                self.board.append(list(board[i * 9:(i + 1) * 9]))
+        self._puzzle = None
 
-    def __getitem__(self, i):
-        return self.board[i]
+        self._solutions = set()
+        self._action_list = []
 
-    def __setitem__(self, i, val):
-        self.board[i] = val
+    @abstractmethod
+    def solve(self, puzzle: np.array) -> np.array:
+        self._puzzle = puzzle
 
-    def __hash__(self):
-        return hash(repr(self))
-
-    def __repr__(self):
-        return ''.join([''.join(row) for row in self.board])
-
-    def __str__(self):
-        h_line = f"+{'-' * 23}+\n"
-        row_template = "| {} {} {} | {} {} {} | {} {} {} |\n"
-
-        puzzle_str = ''
-        for i, line in enumerate(self.board):
-            if i % 3 == 0:
-                puzzle_str += h_line
-
-            puzzle_str += row_template.format(*line)
-
-        return puzzle_str + h_line
-
-    def copy(self):
-        return Board(deepcopy(self.board))
-
-
-class Sudoku:
-    def __init__(self, puzzle=None):
-        self.log = logging.getLogger()
-        self.solutions = set()
-        self.action_list = []
-
-        if puzzle is None:
-            for _ in self.generate_puzzle():  # self.generate_puzzle is a generator
-                pass
-        else:
-            self.original_puzzle = Board(puzzle)
-
-        self.puzzle = self.original_puzzle.copy()
-
-    def __getitem__(self, i):
-        return self.puzzle[i]
-
-    def __setitem__(self, i, val):
-        self.puzzle[i] = val
-
-    def __str__(self):
-        return self.original_puzzle.__str__()
-
-    def create_solved_puzzle(self):
-        # Create blank board
-        puzzle = Board()
-
-        # Randomly fill in the first layer
-        puzzle[0] = list(range(1, 10))
-        random.shuffle(puzzle[0])
-
-        # Fill in the rest of the board
-        self.solve_puzzle_fast_init(puzzle)
-
-        solving = True
-        while solving:
-            solving, move = self.solve_puzzle_fast_step(generateRandom=True)
-
-            value, row, col = move
-            puzzle[row][col] = value
-
-        return puzzle
-
-    def multiple_solutions(self):
-        solving = True
-        while solving:
-            solving, move = self.solve_puzzle_fast_step()
-            print(solving, move)
-
-        self.log.debug('Number of Solutions Found:', len(self.solutions))
-        # [print(x.__repr__()) for x in self.solutions]
-        self.action_list = []
-        return len(self.solutions) == 1
-
-    def generate_puzzle(self):
-        puzzle_solution = self.create_solved_puzzle()
-
-        self.log.debug('Solved Puzzle:')
-        self.log.debug(puzzle_solution)
-
-        # Remove random numbers from the board until a puzzle with multiple solutions
-        #    is generated.
-        i = 0
-        self.solve_puzzle_fast_init()
-        self.log.debug('entering loop')
-        while self.multiple_solutions() and i < 81:
-            random_row, random_col = random.randint(0, 8), random.randint(0, 8)
-            old_num = self.original_puzzle[random_row][random_col]
-
-            while old_num == ' ':
-                random_row, random_col = random.randint(0, 8), random.randint(0, 8)
-                old_num = self.original_puzzle[random_row][random_col]
-
-            # self.original_puzzle[random_row][random_col] = ' '
-            key = (int(old_num), random_row, random_col)
-            self.log.debug(key)
-
-            # for row in self.rows_info.keys():
-            # self.rows_info[row] = self.rows_info[row][0], None
-            # for i, row in enumerate(self.constraints_info):
-            # if key in row[2] or key in row[3]:
-            # print(i, row)
-            self.log.debug(i)
-            self.back_step(permanent=True, sub_key=(int(old_num), random_row, random_col))
-            self.log.debug(self.original_puzzle)
-            # if i == 0:
-            # print(self.original_puzzle)
-            # a1, b1, c1 = self.constraints_matrix, self.rows_info, self.constraints_info
-
-            # for i, row in enumerate(c1):
-            # print(i, row)
-
-            # for k, v in b1.items():
-            # print(k, v)
-            i += 1
-            yield random_row, random_col, ' '
-        self.log.debug('Left loop')
-
-        # Replace the most recently removed number
-        self.original_puzzle[random_row][random_col] = old_num
-
-        yield random_row, random_col, old_num
-
-        self.log.debug('Finished Puzzle:')
-        self.log.debug(self.original_puzzle)
-        self.puzzle = self.original_puzzle.copy()
-
-    def neighbours(self, row: int, col: int):
+    def _neighbours(self, row: int, col: int):
         """
         Find the neighbouring cells for a chosen cell on a Sudoku board.
             Yield a generator of each value in the neighbours.
@@ -185,26 +51,129 @@ class Sudoku:
 
                 yield (_row, _col), self[_row][_col]
 
-    def solve_puzzle(self, alg: str = None):
-        if alg is None:
-            alg = 'fast'
 
-        if alg not in ['slow', 'fast']:
-            raise ValueError("'alg' is either 'slow' or 'fast'")
+class BacktrackSudokuSolver(SudokuSolver):
+    """
+    A simple sudoku solver which uses trial and error with backtracking to find a solution
+    to a given puzzle. Very lightweight, but not very fast.
+    """
+    def _check_validity(self, row: int, col: int, val: int):
+        if (self._puzzle[row, :] == val).any():
+            return False
 
-        alg_function = {
-            'fast': self.solve_puzzle_fast,
-            'slow': self.solve_puzzle_slow}[alg]
-        alg_function()
+        if (self._puzzle[:, col] == val).any():
+            return False
+
+        box_row_origin, box_col_origin = (row // 3) * 3, (col // 3) * 3
+        if (self._puzzle[box_row_origin:box_row_origin + 3,
+            box_col_origin:box_col_origin + 3] == val).any():
+            return False
+
+        return True
+
+    def solve(self, puzzle: np.array):
+        """A backtracking algorithm for solving a sudoku puzzle
+        """
+        super().solve(puzzle)
+        
+        idx = 0
+        while (puzzle == 0).any():
+            row, col = idx // 9, idx % 9
+
+            # Find the next empty cell
+            while puzzle[row, col]:
+                idx += 1
+
+            # Find the next valid value for this cell
+            cell_value = puzzle[row, col] + 1
+            while cell_value <= 10 and not self._check_validity(row, col, cell_value):
+                cell_value += 1
+
+            # Backtrack if we run out of valid options
+            if cell_value > 9:
+                puzzle[row, col] = 0
+                idx -= 1
+                continue
+
+            puzzle[row, col] = cell_value
+
+        return puzzle
+
+
+class DancingChainsSudokuSolver(SudokuSolver):
+    def __init__(self):
+        super().__init__()
+
+        # Create global data
+        self.constraints_info, self.rows_info, self.constraints_matrix = self._create_constraints_matrix()
+        self.best_constraints, self.best_actions = [], []  # Stores persistent info about future actions
+
+        # log global data
+        # self.log.debug('constraints_info:', self.constraints_info)
+        # self.log.debug('rows_info:', self.rows_info)
+        # self.log.debug('constraints_matrix:', self.constraints_matrix)
+
+        # for row in self.constraints_matrix.keys():
+        # self.log.debug(f"{row} ({self.rows_info[row]}): {self.constraints_matrix[row]}")
+
+    def _create_constraints_matrix(self, cell_count=81, constraints_count=324):
+
+        # constraints matrix which defines which constraints each row fulfills
+        matrix = {}
+        # Visibility, number of rows which satisfy constraint, rows which satisfy constraint
+        constraints_info = [[True, 0, set(), set()] for _ in range(constraints_count)]
+        # Visibility of rows
+        rows_info = {}
+
+        for cell_index in range(cell_count):
+            for possibility in range(1, 10):
+                # Each cell contains two bools, referring to the status re the
+                #     constraint and its visibility
+                k = (possibility, cell_index // 9, cell_index % 9)  # Define matrix keys
+
+                # Define constraint details for each key
+                constraints_satisfied = [
+                    k[1] * 9 + k[2],
+                    k[1] * 9 + (k[0] - 1) + cell_count * 1,
+                    k[2] * 9 + (k[0] - 1) + cell_count * 2,
+                    ((k[1] // 3) * 3 + k[2] // 3) * 9 + (k[0] - 1) + cell_count * 3
+                ]
+
+                matrix[k] = [False for _ in range(constraints_count)]
+                for c in constraints_satisfied:
+                    matrix[k][c] = True
+                    constraints_info[c][1] += 1
+                    constraints_info[c][2].add(k)
+                matrix[k] = tuple(matrix[k])
+
+                # Visibility of each constraint matrix row, defaults to True
+                #    and which other key they were eliminated by
+                rows_info[k] = True, None
+
+        return constraints_info, rows_info, matrix
+
+    def _init_solve(self):
+        # Input preset values
+        puzzle_iterator = np.nditer(self._puzzle, order='C', flags=['multi_index'])
+        for cell_value in puzzle_iterator:
+            if not cell_value:
+                continue
+
+            # self.log.debug(f"Coords: ({i}, {j}). Value: {int(value)}")
+            self._remove_rows(cell_value, puzzle_iterator.multi_index, permanent=True)
+    def solve(self, puzzle: np.array):
+        super().solve(puzzle)
+        
+        self._init_solve()
 
     def _remove_rows(self, k, permanent=False):
         """ Remove all rows which satisfy a constraint also satisfied by k
         """
         self[k[1]][k[2]] = str(k[0])
         if not permanent:
-            if self.action_list:
-                self.action_list[-1][1].add(k)
-            self.action_list.append((k, set()))
+            if self._action_list:
+                self._action_list[-1][1].add(k)
+            self._action_list.append((k, set()))
 
         row_k = self.constraints_matrix[k]
         # Iterate through the constraints that are satisfied by row_k
@@ -228,8 +197,8 @@ class Sudoku:
                                     self.constraints_info[jcol][2].remove(secondary_k)
                                     self.constraints_info[jcol][3].add(secondary_k)
 
-    def back_step(self, permanent=False, sub_key=None):
-        """ Add the rows removed by the most recent action in the action_list 
+    def _back_step(self, permanent=False, sub_key=None):
+        """ Add the rows removed by the most recent action in the action_list
         """
 
         def find_constraints(k):
@@ -243,10 +212,10 @@ class Sudoku:
             return constraints_satisfied
 
         if not permanent:
-            if not self.action_list:
+            if not self._action_list:
                 return False, None
 
-            previous_action = self.action_list.pop()
+            previous_action = self._action_list.pop()
             key, children = previous_action[0], previous_action[1]
             self[key[1]][key[2]] = ' '
         else:
@@ -305,75 +274,13 @@ class Sudoku:
 
         return True, (' ', row, col)
 
-    def _create_constraints_matrix(self, cell_count=81, constraints_count=324):
-
-        # constraints matrix which defines which constraints each row fulfills
-        matrix = {}
-        # Visibility, number of rows which satisfy constraint, rows which satisfy constraint
-        constraints_info = [[True, 0, set(), set()] for _ in range(constraints_count)]
-        # Visibility of rows
-        rows_info = {}
-
-        for cell_index in range(cell_count):
-            for possibility in range(1, 10):
-                # Each cell contains two bools, referring to the status re the
-                #     constraint and its visibility
-                k = (possibility, cell_index // 9, cell_index % 9)  # Define matrix keys
-
-                # Define constraint details for each key
-                constraints_satisfied = [
-                    k[1] * 9 + k[2],
-                    k[1] * 9 + (k[0] - 1) + cell_count * 1,
-                    k[2] * 9 + (k[0] - 1) + cell_count * 2,
-                    ((k[1] // 3) * 3 + k[2] // 3) * 9 + (k[0] - 1) + cell_count * 3
-                ]
-
-                matrix[k] = [False for _ in range(constraints_count)]
-                for c in constraints_satisfied:
-                    matrix[k][c] = True
-                    constraints_info[c][1] += 1
-                    constraints_info[c][2].add(k)
-                matrix[k] = tuple(matrix[k])
-
-                # Visibility of each constraint matrix row, defaults to True
-                #    and which other key they were eliminated by
-                rows_info[k] = True, None
-
-        return constraints_info, rows_info, matrix
-
-    def solve_puzzle_fast_init(self):
-        # Create global data
-        self.puzzle = self.original_puzzle.copy()
-        self.solutions = set()
-        self.action_list = []  # Stores info about past actions
-        self.constraints_info, self.rows_info, self.constraints_matrix = self._create_constraints_matrix()
-        self.best_constraints, self.best_actions = [], []  # Stores persistent info about future actions
-
-        # log global data
-        # self.log.debug('constraints_info:', self.constraints_info)
-        # self.log.debug('rows_info:', self.rows_info)
-        # self.log.debug('constraints_matrix:', self.constraints_matrix)
-
-        # Input preset values
-        for i, row in enumerate(self.puzzle):
-            for j, col in enumerate(row):
-                value = self.puzzle[i][j]
-                if value == ' ':
-                    continue
-
-                # self.log.debug(f"Coords: ({i}, {j}). Value: {int(value)}")
-                self._remove_rows((int(value), i, j), permanent=True)
-
-        # for row in self.constraints_matrix.keys():
-        # self.log.debug(f"{row} ({self.rows_info[row]}): {self.constraints_matrix[row]}")
-
     def solve_puzzle_fast_step(self, generateRandom=False):
         """A dancing links algoritm for solving a sudoku puzzle
         """
 
         constraints_info = self.constraints_info
         constraints_matrix = self.constraints_matrix
-        action_list = self.action_list
+        action_list = self._action_list
         rows_info = self.rows_info
 
         record = sum(c[0] for c in constraints_info)
@@ -435,38 +342,118 @@ class Sudoku:
 
         return True, move
 
-    def solve_puzzle_slow(self):
-        """A bactracking algorithm for solving a sudoku puzzle
-        """
 
-        # count = 0
-        # for row in self.puzzle:
-        # for cell in row:
-        # if cell == ' ':
-        # count += 1
-        # self.log.debug(count)
+class Sudoku:
+    def __init__(self, puzzle=None):
+        self.log = logging.getLogger()
 
-        def check_validity(self, i, j, val):
-            for cell in self.neighbours(i, j):
-                if cell[0] == val:
-                    return False
-            return True
+        self.puzzle: np.array | None = self._interpret_puzzle_repr(puzzle)
+        self.solver = BacktrackSudokuSolver()
 
-        finished = True
-        for i, row in enumerate(self.puzzle):
-            for j, col in enumerate(row):
-                tile = self.puzzle[i][j]
-                if tile == ' ':
-                    # self.log.debug(i, j)
-                    finished = False
-                    for x in range(1, 10):
-                        if check_validity(self, i, j, str(x)):
-                            # self.log.debug('\t', str(x))
-                            self.puzzle[i][j] = str(x)
-                            self.solve_puzzle_slow()
-                            self.puzzle[i][j] = ' '
-        if finished:
-            self.log.debug(self.puzzle)
+    @staticmethod
+    def _interpret_puzzle_repr(puzzle: str | list | None):
+        if isinstance(puzzle, list):
+            puzzle_array = np.array(puzzle)
+            puzzle_array[puzzle_array == ' '] = 0
+            return puzzle_array
+        elif isinstance(puzzle, str):
+            return np.array(list(puzzle)).reshape((9, 9))
+        else:
+            return puzzle
+
+    def __repr__(self):
+        return ''.join([''.join(row) for row in self.puzzle])
+
+    def __str__(self):
+        h_line = f"+{'-' * 23}+\n"
+        row_template = "| {} {} {} | {} {} {} | {} {} {} |\n"
+
+        puzzle_str = ''
+        for i, line in enumerate(self.puzzle):
+            if i % 3 == 0:
+                puzzle_str += h_line
+
+            puzzle_str += row_template.format(*line)
+
+        return puzzle_str + h_line
+
+    def solve(self):
+        return self.solver.solve(self.puzzle)
+
+    def create_solved_puzzle(self):
+        # Create blank board
+        puzzle = np.zeros((9, 9), dtype=np.uint8)
+
+        # Randomly fill in the first layer
+        puzzle[0, :] = np.arange(1, 10)
+        np.random.shuffle(self.puzzle[0, :])
+
+        # Fill in the rest of the board
+        return self.solver.solve(puzzle)
+
+    # def _multiple_solutions(self):
+    #     solving = True
+    #     while solving:
+    #         solving, move = self.solve_puzzle_fast_step()
+    #         print(solving, move)
+    #
+    #     self.log.debug('Number of Solutions Found:', len(self.solutions))
+    #     # [print(x.__repr__()) for x in self.solutions]
+    #     self._action_list = []
+    #     return len(self.solutions) == 1
+
+    def generate_puzzle(self):
+        puzzle_solution = self.create_solved_puzzle()
+
+        # self.log.debug('Solved Puzzle:')
+        # self.log.debug(puzzle_solution)
+        #
+        # # Remove random numbers from the board until a puzzle with multiple solutions
+        # #    is generated.
+        # i = 0
+        # self.solve_puzzle_fast_init()
+        # self.log.debug('entering loop')
+        # while self._multiple_solutions() and i < 81:
+        #     random_row, random_col = random.randint(0, 8), random.randint(0, 8)
+        #     old_num = self._original_puzzle[random_row][random_col]
+        #
+        #     while old_num == ' ':
+        #         random_row, random_col = random.randint(0, 8), random.randint(0, 8)
+        #         old_num = self._original_puzzle[random_row][random_col]
+        #
+        #     # self.original_puzzle[random_row][random_col] = ' '
+        #     key = (int(old_num), random_row, random_col)
+        #     self.log.debug(key)
+        #
+        #     # for row in self.rows_info.keys():
+        #     # self.rows_info[row] = self.rows_info[row][0], None
+        #     # for i, row in enumerate(self.constraints_info):
+        #     # if key in row[2] or key in row[3]:
+        #     # print(i, row)
+        #     self.log.debug(i)
+        #     self.back_step(permanent=True, sub_key=(int(old_num), random_row, random_col))
+        #     self.log.debug(self.original_puzzle)
+        #     # if i == 0:
+        #     # print(self.original_puzzle)
+        #     # a1, b1, c1 = self.constraints_matrix, self.rows_info, self.constraints_info
+        #
+        #     # for i, row in enumerate(c1):
+        #     # print(i, row)
+        #
+        #     # for k, v in b1.items():
+        #     # print(k, v)
+        #     i += 1
+        #     yield random_row, random_col, ' '
+        # self.log.debug('Left loop')
+        #
+        # # Replace the most recently removed number
+        # self.original_puzzle[random_row][random_col] = old_num
+        #
+        # yield random_row, random_col, old_num
+        #
+        # self.log.debug('Finished Puzzle:')
+        # self.log.debug(self.original_puzzle)
+        # self.puzzle = self.original_puzzle.copy()
 
 
 if __name__ == '__main__':

@@ -14,7 +14,8 @@ setup(
     package_dir={'': 'src'},
     packages=['sudoku_solver'],
     install_requires=[
-        'pygame'
+        'pygame',
+        'numpy'
     ],
     package_data={
     },

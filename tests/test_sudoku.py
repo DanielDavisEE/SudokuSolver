@@ -95,3 +95,20 @@ class TestSudoku(unittest.TestCase):
         #     game_gui.draw_board()
         #
         # pygame.quit()
+
+    def test_interpret_puzzle_repr(self):
+        with self.subTest('None'):
+            pass
+
+        with self.subTest('str'):
+            pass
+
+        with self.subTest('list'):
+            pass
+
+    def test_str(self):
+        pass
+
+    def test_repr(self):
+        pass
+
