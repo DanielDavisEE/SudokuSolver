@@ -1,6 +1,5 @@
 import pygame
 from pygame.locals import *
-import utils
 
 BASE_UNIT = 20
 TILE_DIM = 2
@@ -8,7 +7,7 @@ BOARD_DIM = TILE_DIM * 9 + 0.1 * 10 + 0.1 * 2
 pygame.init()
 
 
-class Board():
+class SudokuGUI:
 
     def __init__(self, isMain=False, backend=None, puzzle=None):
         if not pygame.font:
@@ -169,7 +168,7 @@ class Board():
 
         # Create rect object for simplicity of collision detection
         button_rect = Rect([int(coord * BASE_UNIT) for coord in overall_coords],
-                           [int(dim * BASE_UNIT) for dim in dimensions])
+            [int(dim * BASE_UNIT) for dim in dimensions])
         self.button_list.append((name, button_rect, function))
 
         # Create surface as usual
@@ -185,7 +184,7 @@ class Board():
         font = pygame.font.Font(None, size)
         text = font.render(str(value), 1, self.colours[colour])
         pos = (text.get_rect(centerx=coords[0],
-                             centery=coords[1]))
+            centery=coords[1]))
         self.text_list[name] = [text, pos, parent]
 
     def create_surface(self, block_info):
@@ -218,7 +217,7 @@ class Board():
                 number_text = number_font.render(' ', 1, (0, 0, 0))
                 coords = [int(n * BASE_UNIT // 2) for n in tile_info_dict['dimensions']]
                 number_pos = (number_text.get_rect(centerx=coords[0],
-                                                   centery=coords[1]))
+                    centery=coords[1]))
 
                 self.text_list[f'{row}{col}'] = [number_text, number_pos, name]
 
@@ -309,6 +308,46 @@ def main():
 
     game_inst.run_GUI()
 
+
+# # pygame.key.set_repeat(1000, 100)
+#
+# game_gui = BoardGUI()
+# game_inst = Sudoku(game_gui=game_gui, puzzle=ex4, isMain=True)
+#
+# game_inst.solve_puzzle_fast_init()
+#
+# running, solving, solved = True, True, False
+#
+# game_gui.draw_board()
+#
+# while running:
+#     pygame.time.delay(10)
+#     for event in pygame.event.get():
+#         if event.type == KEYDOWN and event.key == K_ESCAPE:
+#             running = False
+#         if event.type == pygame.QUIT:
+#             running = False
+#
+#     if solving:
+#         solving, move = game_inst.solve_puzzle_fast_step()
+#         if move is not None:
+#             value, row, col = move
+#             game_inst.game_gui.set_value(row, col, value)
+#             print(move)
+#             # print(game_inst.puzzle)
+#         if not solving:
+#             solved = True
+#
+#     if solved:
+#         solved = False
+#         print(f"{'-' * 20} Solutions {'-' * 20`}")
+#         for solution in game_inst.solutions:
+#             print(f"New Solution:")
+#             print(solution)
+#
+#     game_gui.draw_board()
+#
+# pygame.quit()
 
 if __name__ == '__main__':
     from sudoku import Sudoku as GS

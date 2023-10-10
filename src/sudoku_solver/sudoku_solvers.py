@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
+from sudoku_solver.sudoku import SudokuBoard
+
 logging.basicConfig(level=logging.DEBUG)
 
 
@@ -11,14 +13,26 @@ class SudokuSolver(ABC):
     def __init__(self):
         self.log = logging.getLogger(self.__class__.__name__)
 
+        self._original_puzzle = None
         self._puzzle = None
 
         self._solutions = set()
         self._action_list = []
 
     @abstractmethod
-    def solve(self, puzzle: np.array) -> np.array:
-        self._puzzle = puzzle
+    def solve(self, puzzle: SudokuBoard) -> SudokuBoard:
+        self._puzzle = puzzle.copy()
+
+    def create_solved_puzzle(self) -> SudokuBoard:
+        # Create blank board
+        _puzzle = SudokuBoard()
+
+        # Randomly fill in the first layer
+        _puzzle[0, :] = np.arange(1, 10)
+        np.random.shuffle(_puzzle[0, :])
+
+        # Fill in the rest of the board
+        return self.solve(_puzzle)
 
     def _neighbours(self, row: int, col: int):
         """
@@ -33,19 +47,19 @@ class SudokuSolver(ABC):
             tuple[int, int], int: A row, col coordinate tuple and the value at those coordinates
         """
         # Iterate down the column
-        for _row in range(Sudoku.HEIGHT):
+        for _row in range(SudokuBoard.HEIGHT):
             if _row != row:
                 yield (_row, col), self._puzzle[_row][col]
 
         # Iterate across the row
-        for _col in range(Sudoku.WIDTH):
+        for _col in range(SudokuBoard.WIDTH):
             if _col != col:
                 yield (row, _col), self._puzzle[row][_col]
 
         # Iterate through the 3x3 box
-        box_row_origin, box_col_origin = Sudoku.get_box_origin(row, col)
-        for row_diff in range(Sudoku.BOX_HEIGHT):
-            for col_diff in range(Sudoku.BOX_WIDTH):
+        box_row_origin, box_col_origin = SudokuBoard.get_box_origin(row, col)
+        for row_diff in range(SudokuBoard.BOX_HEIGHT):
+            for col_diff in range(SudokuBoard.BOX_WIDTH):
                 _row, _col = box_row_origin + row_diff, box_col_origin + col_diff
                 if (_row, _col) == (row, col):
                     continue
@@ -59,50 +73,33 @@ class BacktrackSudokuSolver(SudokuSolver):
     to a given puzzle. Very lightweight, but not very fast.
     """
 
-    def _check_validity(self, row: int, col: int, val: int):
-        if (self._puzzle[row, :] == val).any():
-            return False
-
-        if (self._puzzle[:, col] == val).any():
-            return False
-
-        box_row_origin, box_col_origin = (row // 3) * 3, (col // 3) * 3
-        if (
-            self._puzzle[
-                box_row_origin : box_row_origin + 3, box_col_origin : box_col_origin + 3
-            ]
-            == val
-        ).any():
-            return False
-
-        return True
-
-    def solve(self, puzzle: np.array):
+    def solve(self, puzzle: SudokuBoard):
         """A backtracking algorithm for solving a sudoku puzzle"""
         super().solve(puzzle)
 
         idx = 0
-        while (puzzle == 0).any():
+        while (self._puzzle == 0).any():
             row, col = idx // 9, idx % 9
 
             # Find the next empty cell
-            while puzzle[row, col]:
+            while self._puzzle[row, col]:
                 idx += 1
+                row, col = idx // 9, idx % 9
 
             # Find the next valid value for this cell
-            cell_value = puzzle[row, col] + 1
+            cell_value = self._puzzle[row, col] + 1
             while cell_value <= 10 and not self._check_validity(row, col, cell_value):
                 cell_value += 1
 
             # Backtrack if we run out of valid options
             if cell_value > 9:
-                puzzle[row, col] = 0
+                self._puzzle[row, col] = 0
                 idx -= 1
                 continue
 
-            puzzle[row, col] = cell_value
+            self._puzzle[row, col] = cell_value
 
-        return puzzle
+        return self._puzzle
 
 
 class DancingChainsSudokuSolver(SudokuSolver):
@@ -262,7 +259,7 @@ class DancingChainsSudokuSolver(SudokuSolver):
                                 # Increment constraint satisfied count and move key
                                 #     from unavailable set to available set
                                 for jcol in find_constraints(
-                                    secondary_k
+                                        secondary_k
                                 ):  # , secondaryConstraint in enumerate(secondary_row):
                                     if secondary_row[jcol]:
                                         self.constraints_info[jcol][1] += 1
@@ -354,3 +351,68 @@ class DancingChainsSudokuSolver(SudokuSolver):
             self._remove_rows((int(value), row, col))
 
         return True, move
+
+
+# def _multiple_solutions(self):
+#     solving = True
+#     while solving:
+#         solving, move = self.solve_puzzle_fast_step()
+#         print(solving, move)
+#
+#     self.log.debug('Number of Solutions Found:', len(self.solutions))
+#     # [print(x.__repr__()) for x in self.solutions]
+#     self._action_list = []
+#     return len(self.solutions) == 1
+
+def generate_puzzle():
+    puzzle_solution = create_solved_puzzle()
+
+    # self.log.debug('Solved _puzzle:')
+    # self.log.debug(puzzle_solution)
+    #
+    # # Remove random numbers from the board until a _puzzle with multiple solutions
+    # #    is generated.
+    # i = 0
+    # self.solve_puzzle_fast_init()
+    # self.log.debug('entering loop')
+    # while self._multiple_solutions() and i < 81:
+    #     random_row, random_col = random.randint(0, 8), random.randint(0, 8)
+    #     old_num = self._original_puzzle[random_row][random_col]
+    #
+    #     while old_num == ' ':
+    #         random_row, random_col = random.randint(0, 8), random.randint(0, 8)
+    #         old_num = self._original_puzzle[random_row][random_col]
+    #
+    #     # self.original_puzzle[random_row][random_col] = ' '
+    #     key = (int(old_num), random_row, random_col)
+    #     self.log.debug(key)
+    #
+    #     # for row in self.rows_info.keys():
+    #     # self.rows_info[row] = self.rows_info[row][0], None
+    #     # for i, row in enumerate(self.constraints_info):
+    #     # if key in row[2] or key in row[3]:
+    #     # print(i, row)
+    #     self.log.debug(i)
+    #     self.back_step(permanent=True, sub_key=(int(old_num), random_row, random_col))
+    #     self.log.debug(self.original_puzzle)
+    #     # if i == 0:
+    #     # print(self.original_puzzle)
+    #     # a1, b1, c1 = self.constraints_matrix, self.rows_info, self.constraints_info
+    #
+    #     # for i, row in enumerate(c1):
+    #     # print(i, row)
+    #
+    #     # for k, v in b1.items():
+    #     # print(k, v)
+    #     i += 1
+    #     yield random_row, random_col, ' '
+    # self.log.debug('Left loop')
+    #
+    # # Replace the most recently removed number
+    # self.original_puzzle[random_row][random_col] = old_num
+    #
+    # yield random_row, random_col, old_num
+    #
+    # self.log.debug('Finished _puzzle:')
+    # self.log.debug(self.original_puzzle)
+    # self._puzzle = self.original_puzzle.copy()

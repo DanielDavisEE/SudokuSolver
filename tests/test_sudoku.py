@@ -3,14 +3,12 @@ from unittest import mock
 
 import numpy as np
 
-from sudoku_solver.sudoku import Sudoku
+from sudoku_solver.sudoku import SudokuBoard
 
 
-class TestSudoku(unittest.TestCase):
+class TestSudokuBoard(unittest.TestCase):
     def setUp(self) -> None:
-        self.sudoku = Sudoku()
-
-        self.unsolved_puzzle_1 = np.array(
+        self.unsolved_puzzle_1 = SudokuBoard(
             [
                 [5, 3, 0, 0, 7, 0, 0, 0, 0],
                 [6, 0, 0, 1, 9, 5, 0, 0, 0],
@@ -23,7 +21,7 @@ class TestSudoku(unittest.TestCase):
                 [0, 0, 0, 0, 8, 0, 0, 7, 9],
             ]
         )
-        self.solved_puzzle_1 = np.array(
+        self.solved_puzzle_1 = SudokuBoard(
             [
                 [5, 3, 4, 6, 7, 8, 9, 1, 2],
                 [6, 7, 2, 1, 9, 5, 3, 4, 8],
@@ -36,7 +34,8 @@ class TestSudoku(unittest.TestCase):
                 [3, 4, 5, 2, 8, 6, 1, 7, 9],
             ]
         )
-        self.sudoku = Sudoku(self.unsolved_puzzle_1)
+        self.sudoku = SudokuBoard(self.unsolved_puzzle_1)
+
         mock_sudoku_solver = mock.MagicMock()
         mock_sudoku_solver.solve.side_effect = lambda x: x
         self.sudoku.solver = mock_sudoku_solver
@@ -86,59 +85,19 @@ class TestSudoku(unittest.TestCase):
         #     [" ", "6", " ", "9", " ", " ", " ", " ", " "],
         # ]
 
-        # # pygame.key.set_repeat(1000, 100)
-        #
-        # game_gui = BoardGUI()
-        # game_inst = Sudoku(game_gui=game_gui, puzzle=ex4, isMain=True)
-        #
-        # game_inst.solve_puzzle_fast_init()
-        #
-        # running, solving, solved = True, True, False
-        #
-        # game_gui.draw_board()
-        #
-        # while running:
-        #     pygame.time.delay(10)
-        #     for event in pygame.event.get():
-        #         if event.type == KEYDOWN and event.key == K_ESCAPE:
-        #             running = False
-        #         if event.type == pygame.QUIT:
-        #             running = False
-        #
-        #     if solving:
-        #         solving, move = game_inst.solve_puzzle_fast_step()
-        #         if move is not None:
-        #             value, row, col = move
-        #             game_inst.game_gui.set_value(row, col, value)
-        #             print(move)
-        #             # print(game_inst.puzzle)
-        #         if not solving:
-        #             solved = True
-        #
-        #     if solved:
-        #         solved = False
-        #         print(f"{'-' * 20} Solutions {'-' * 20`}")
-        #         for solution in game_inst.solutions:
-        #             print(f"New Solution:")
-        #             print(solution)
-        #
-        #     game_gui.draw_board()
-        #
-        # pygame.quit()
-
     def test_interpret_puzzle_repr(self):
         with self.subTest("None"):
-            sudoku = Sudoku()
-            self.assertEqual(sudoku.puzzle, None)
+            sudoku = SudokuBoard()
+            self.assertListEqual(sudoku.tolist(), [[0] * 9] * 9)
 
         with self.subTest("str"):
-            sudoku = Sudoku("".join(self.unsolved_puzzle_1.astype(str).reshape(-1)))
-            self.assertEqual(sudoku.puzzle.tolist(), self.unsolved_puzzle_1.tolist())
+            sudoku = SudokuBoard(repr(self.unsolved_puzzle_1))
+            self.assertListEqual(sudoku.tolist(), self.unsolved_puzzle_1.tolist())
 
         with self.subTest("list"):
-            sudoku = Sudoku(self.unsolved_puzzle_1)
+            sudoku = SudokuBoard(self.unsolved_puzzle_1.tolist())
             self.assertListEqual(
-                sudoku.puzzle.tolist(), self.unsolved_puzzle_1.tolist()
+                sudoku.array.tolist(), self.unsolved_puzzle_1.tolist()
             )
 
     def test_str(self):
@@ -161,24 +120,45 @@ class TestSudoku(unittest.TestCase):
 
     def test_repr(self):
         self.assertEqual(
-            repr(self.sudoku), "".join(self.sudoku.puzzle.astype(str).reshape(-1))
+            repr(self.sudoku), "".join(self.sudoku.array.astype(str).reshape(-1))
         )
 
     def test_get_box_origin(self):
-        self.assertEqual(Sudoku.get_box_origin(0, 0), (0, 0))
-        self.assertEqual(Sudoku.get_box_origin(3, 3), (3, 3))
-        self.assertEqual(Sudoku.get_box_origin(8, 4), (6, 3))
-        self.assertEqual(Sudoku.get_box_origin(5, 2), (3, 0))
-        self.assertEqual(Sudoku.get_box_origin(7, 0), (6, 0))
+        self.assertEqual(SudokuBoard.get_box_origin(0, 0), (0, 0))
+        self.assertEqual(SudokuBoard.get_box_origin(3, 3), (3, 3))
+        self.assertEqual(SudokuBoard.get_box_origin(8, 4), (6, 3))
+        self.assertEqual(SudokuBoard.get_box_origin(5, 2), (3, 0))
+        self.assertEqual(SudokuBoard.get_box_origin(7, 0), (6, 0))
 
-        self.assertRaises(ValueError, Sudoku.get_box_origin, 9, 1)
-        self.assertRaises(ValueError, Sudoku.get_box_origin, 1, 10)
-        self.assertRaises(ValueError, Sudoku.get_box_origin, -1, 1)
-        self.assertRaises(ValueError, Sudoku.get_box_origin, 1, -2)
+        self.assertRaises(ValueError, SudokuBoard.get_box_origin, 9, 1)
+        self.assertRaises(ValueError, SudokuBoard.get_box_origin, 1, 10)
+        self.assertRaises(ValueError, SudokuBoard.get_box_origin, -1, 1)
+        self.assertRaises(ValueError, SudokuBoard.get_box_origin, 1, -2)
 
-    def test_create_solved_puzzle(self):
-        with mock.patch("numpy.random.shuffle", side_effect=lambda x: x):
-            empty_puzzle = [list(range(1, 10))] + [[0] * 9] * 8
-            self.assertListEqual(
-                self.sudoku.create_solved_puzzle().tolist(), empty_puzzle
-            )
+    def test_check_validity(self):
+        with self.subTest('correct_values'):
+            puzzle_iterator = np.nditer(self.unsolved_puzzle_1.array, order="C", flags=["multi_index"])
+            for cell in puzzle_iterator:
+                cell_value = int(cell)
+                if cell_value:
+                    continue
+
+                row, col = puzzle_iterator.multi_index
+                true_value = self.solved_puzzle_1.array[row, col]
+
+                self.assertTrue(self.unsolved_puzzle_1.check_validity(row, col, true_value), f"{(row, col, int(cell_value))}")
+
+        options = set(range(1, 10))
+        with self.subTest('incorrect_values'):
+            empty_puzzle = SudokuBoard()
+            empty_puzzle.array[0, 0] = 5
+
+            self.assertFalse(empty_puzzle.check_validity(0, 8, 5), f"{(0, 8, 5)}")
+            self.assertFalse(empty_puzzle.check_validity(8, 0, 5), f"{(8, 0, 5)}")
+            self.assertFalse(empty_puzzle.check_validity(1, 1, 5), f"{(1, 1, 5)}")
+
+    def test_tolist(self):
+        pass
+
+    def test_copy(self):
+        pass
