@@ -13,11 +13,11 @@ class SudokuSolver(ABC):
     def __init__(self):
         self.log = logging.getLogger(self.__class__.__name__)
 
-        self._original_puzzle = None
-        self._puzzle = None
+        # self._original_puzzle = None
+        # self._puzzle = None
 
-        self._solutions = set()
-        self._action_list = []
+        # self._solutions = set()
+        # self._action_list = []
 
     @staticmethod
     def puzzle_solved(puzzle: SudokuBoard):

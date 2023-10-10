@@ -1,3 +1,7 @@
+import pygame
+import pygame.locals as py_locals
+
+
 class MyList(dict):
     """
     A dictionary with some list-like properties for storing BlockObjects
@@ -86,3 +90,95 @@ class BlockObject:
 
     def __repr__(self):
         return f'Block({self.parent}, {self.dimensions}, {self.coordinates}, {self.colour}, {self.children}, {self.surface})'
+
+
+class MyGUI:
+    BASE_UNIT = 20
+
+    def __init__(self, window_title, window_size):
+        if not pygame.font:
+            raise ImportError("Fonts not imported")
+
+        pygame.display.set_caption(window_title)
+        self.window = pygame.display.set_mode(window_size)
+
+        self.colours = {
+            'bg_color': (230, 220, 205),
+            'title_colour': (238, 201, 0),
+            'board_colour': (105, 95, 80),
+            'tile_colour': (134, 122, 102),
+            'black': (0, 0, 0),
+            'white': (255, 255, 255)
+        }
+
+        self.block_list = MyList('window', self.window)
+        self.text_list = {}
+        self.button_list = []
+
+    # -------------------------- GUI Drawing ----------------------------
+
+    def blit_text(self):
+        for name, text_object in self.text_list.items():
+            text, position, parent = text_object
+            self.block_list[parent].surface.blit(text, position)
+
+    def draw_board(self):
+
+        def draw_recurse(block_iter):
+            try:
+                block_name, block_info = next(block_iter)
+            except StopIteration:
+                self.blit_text()
+                return True
+
+            self.create_surface(block_info)
+
+            draw_recurse(block_iter)
+
+            parent_surface = self.block_list[block_info.parent].surface
+            block_pos = [int(coord * self.BASE_UNIT) for coord in block_info.coordinates]
+            parent_surface.blit(block_info.surface, block_pos)
+
+        block_iter = iter(self.block_list)
+        draw_recurse(block_iter)
+        pygame.display.flip()
+
+    # -------------------------- Object Creation ----------------------------
+
+    def create_button(self, function, name, parent, dimensions, coordinates, colour):
+        # Coordinates need to be referenced from window, not parent surface
+        parent_tmp = parent
+        overall_coords = list(coordinates)
+        while parent_tmp != 'window':
+            overall_coords[0] += self.block_list[parent_tmp].coordinates[0]
+            overall_coords[1] += self.block_list[parent_tmp].coordinates[1]
+            parent_tmp = self.block_list[parent_tmp].parent
+
+        # Create rect object for simplicity of collision detection
+        button_rect = py_locals.Rect([int(coord * self.BASE_UNIT) for coord in overall_coords],
+            [int(dim * self.BASE_UNIT) for dim in dimensions])
+        self.button_list.append((name, button_rect, function))
+
+        # Create surface as usual
+        self.block_list.append(name, parent, dimensions, coordinates, colour)
+        return self.block_list[name]
+
+    def create_block(self, name, parent, dimensions, coordinates, colour):
+        self.block_list.append(name, parent, dimensions, coordinates, colour)
+        return self.block_list[name]
+
+    def create_text(self, name, value, parent, colour, size):
+        coords = [int(n * self.BASE_UNIT // 2) for n in self.block_list[parent].dimensions]
+        font = pygame.font.Font(None, size)
+        text = font.render(str(value), 1, self.colours[colour])
+        pos = (text.get_rect(centerx=coords[0],
+            centery=coords[1]))
+        self.text_list[name] = [text, pos, parent]
+
+    def create_surface(self, block_info):
+        block_size = [int(dim * self.BASE_UNIT) for dim in block_info.dimensions]
+
+        block = pygame.Surface(block_size)
+        block = block.convert()
+        block.fill(self.colours[block_info.colour])
+        block_info.surface = block

@@ -35,11 +35,11 @@ class SudokuBoard:
         elif isinstance(puzzle, np.ndarray):
             return puzzle.copy()
         elif isinstance(puzzle, list):
-            return np.array(puzzle)
+            return np.array(puzzle, dtype=np.uint8)
         elif isinstance(puzzle, str):
-            return np.array([int(n) for n in puzzle]).reshape((9, 9))
+            return np.array([int(n) for n in puzzle], dtype=np.uint8).reshape((9, 9))
         elif puzzle is None:
-            return np.zeros((9, 9))
+            return np.zeros((9, 9), dtype=np.uint8)
         else:
             raise ValueError(f"Invalid sudoku input type '<{type(puzzle)}>'")
 
