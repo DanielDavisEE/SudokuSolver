@@ -17,7 +17,7 @@ class SudokuSolver(ABC):
         # self._puzzle = None
 
         # self._solutions = set()
-        # self._action_list = []
+        self.action_list = []
 
     @staticmethod
     def puzzle_solved(puzzle: SudokuBoard):
@@ -70,6 +70,70 @@ class SudokuSolver(ABC):
 
                 yield (_row, _col), self._puzzle[_row][_col]
 
+    # def _multiple_solutions(self):
+    #     solving = True
+    #     while solving:
+    #         solving, move = self.solve_puzzle_fast_step()
+    #         print(solving, move)
+    #
+    #     self.log.debug('Number of Solutions Found:', len(self.solutions))
+    #     # [print(x.__repr__()) for x in self.solutions]
+    #     self._action_list = []
+    #     return len(self.solutions) == 1
+
+    def generate_puzzle(self):
+        puzzle_solution = self.create_solved_puzzle()
+
+        # self.log.debug('Solved _puzzle:')
+        # self.log.debug(puzzle_solution)
+        #
+        # # Remove random numbers from the board until a _puzzle with multiple solutions
+        # #    is generated.
+        # i = 0
+        # self.solve_puzzle_fast_init()
+        # self.log.debug('entering loop')
+        # while self._multiple_solutions() and i < 81:
+        #     random_row, random_col = random.randint(0, 8), random.randint(0, 8)
+        #     old_num = self._original_puzzle[random_row][random_col]
+        #
+        #     while old_num == ' ':
+        #         random_row, random_col = random.randint(0, 8), random.randint(0, 8)
+        #         old_num = self._original_puzzle[random_row][random_col]
+        #
+        #     # self.original_puzzle[random_row][random_col] = ' '
+        #     key = (int(old_num), random_row, random_col)
+        #     self.log.debug(key)
+        #
+        #     # for row in self.rows_info.keys():
+        #     # self.rows_info[row] = self.rows_info[row][0], None
+        #     # for i, row in enumerate(self.constraints_info):
+        #     # if key in row[2] or key in row[3]:
+        #     # print(i, row)
+        #     self.log.debug(i)
+        #     self.back_step(permanent=True, sub_key=(int(old_num), random_row, random_col))
+        #     self.log.debug(self.original_puzzle)
+        #     # if i == 0:
+        #     # print(self.original_puzzle)
+        #     # a1, b1, c1 = self.constraints_matrix, self.rows_info, self.constraints_info
+        #
+        #     # for i, row in enumerate(c1):
+        #     # print(i, row)
+        #
+        #     # for k, v in b1.items():
+        #     # print(k, v)
+        #     i += 1
+        #     yield random_row, random_col, ' '
+        # self.log.debug('Left loop')
+        #
+        # # Replace the most recently removed number
+        # self.original_puzzle[random_row][random_col] = old_num
+        #
+        # yield random_row, random_col, old_num
+        #
+        # self.log.debug('Finished _puzzle:')
+        # self.log.debug(self.original_puzzle)
+        # self._puzzle = self.original_puzzle.copy()
+
 
 class BacktrackSudokuSolver(SudokuSolver):
     """
@@ -89,11 +153,15 @@ class BacktrackSudokuSolver(SudokuSolver):
 
         for value in SudokuBoard.VALUE_OPTIONS:
             if puzzle.check_validity(row, col, value):
-                puzzle.array[row, col] = value
+                self.set_value(puzzle, row, col, value)
                 self._recursive_solve(puzzle)
                 if self.puzzle_solved(puzzle):
                     return
-                puzzle.array[row, col] = 0
+                self.set_value(puzzle, row, col, 0)
+
+    def set_value(self, puzzle, row, col, value):
+        puzzle.array[row, col] = value
+        self.action_list.append((row, col, value))
 
     def solve(self, puzzle: SudokuBoard):
         solved_puzzle = puzzle.copy()
@@ -352,71 +420,6 @@ class DancingChainsSudokuSolver(SudokuSolver):
             self._remove_rows((int(value), row, col))
 
         return True, move
-
-
-# def _multiple_solutions(self):
-#     solving = True
-#     while solving:
-#         solving, move = self.solve_puzzle_fast_step()
-#         print(solving, move)
-#
-#     self.log.debug('Number of Solutions Found:', len(self.solutions))
-#     # [print(x.__repr__()) for x in self.solutions]
-#     self._action_list = []
-#     return len(self.solutions) == 1
-
-def generate_puzzle():
-    puzzle_solution = create_solved_puzzle()
-
-    # self.log.debug('Solved _puzzle:')
-    # self.log.debug(puzzle_solution)
-    #
-    # # Remove random numbers from the board until a _puzzle with multiple solutions
-    # #    is generated.
-    # i = 0
-    # self.solve_puzzle_fast_init()
-    # self.log.debug('entering loop')
-    # while self._multiple_solutions() and i < 81:
-    #     random_row, random_col = random.randint(0, 8), random.randint(0, 8)
-    #     old_num = self._original_puzzle[random_row][random_col]
-    #
-    #     while old_num == ' ':
-    #         random_row, random_col = random.randint(0, 8), random.randint(0, 8)
-    #         old_num = self._original_puzzle[random_row][random_col]
-    #
-    #     # self.original_puzzle[random_row][random_col] = ' '
-    #     key = (int(old_num), random_row, random_col)
-    #     self.log.debug(key)
-    #
-    #     # for row in self.rows_info.keys():
-    #     # self.rows_info[row] = self.rows_info[row][0], None
-    #     # for i, row in enumerate(self.constraints_info):
-    #     # if key in row[2] or key in row[3]:
-    #     # print(i, row)
-    #     self.log.debug(i)
-    #     self.back_step(permanent=True, sub_key=(int(old_num), random_row, random_col))
-    #     self.log.debug(self.original_puzzle)
-    #     # if i == 0:
-    #     # print(self.original_puzzle)
-    #     # a1, b1, c1 = self.constraints_matrix, self.rows_info, self.constraints_info
-    #
-    #     # for i, row in enumerate(c1):
-    #     # print(i, row)
-    #
-    #     # for k, v in b1.items():
-    #     # print(k, v)
-    #     i += 1
-    #     yield random_row, random_col, ' '
-    # self.log.debug('Left loop')
-    #
-    # # Replace the most recently removed number
-    # self.original_puzzle[random_row][random_col] = old_num
-    #
-    # yield random_row, random_col, old_num
-    #
-    # self.log.debug('Finished _puzzle:')
-    # self.log.debug(self.original_puzzle)
-    # self._puzzle = self.original_puzzle.copy()
 
 
 if __name__ == '__main__':
