@@ -16,20 +16,24 @@ class SudokuBoard:
     BOX_SHAPE = (BOX_WIDTH, BOX_HEIGHT)
     BOX_N_CELLS = BOX_WIDTH * BOX_HEIGHT
 
+    VALUE_OPTIONS = tuple(range(1, 10))
+
     array: np.ndarray | None
 
     def __init__(self, puzzle=None, *, validate=False):
         self.log = logging.getLogger()
 
-        self.array = self._interpret_puzzle_repr(puzzle)
+        self.array = self._interpret_array_repr(puzzle)
 
         if validate:
             self.validate_board()
 
     @staticmethod
-    def _interpret_puzzle_repr(puzzle: str | list | None) -> np.ndarray:
+    def _interpret_array_repr(puzzle: str | list | None) -> np.ndarray:
         if isinstance(puzzle, SudokuBoard):
             return puzzle.array.copy()
+        elif isinstance(puzzle, np.ndarray):
+            return puzzle.copy()
         elif isinstance(puzzle, list):
             return np.array(puzzle)
         elif isinstance(puzzle, str):
@@ -105,4 +109,7 @@ class SudokuBoard:
         return self.array.tolist()
 
     def copy(self):
-        return self.array.copy()
+        return SudokuBoard(self)
+
+    def by_index(self, idx):
+        return self.array[idx // 9, idx % 9]

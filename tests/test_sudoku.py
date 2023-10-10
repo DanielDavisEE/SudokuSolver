@@ -1,5 +1,4 @@
 import unittest
-from unittest import mock
 
 import numpy as np
 
@@ -8,7 +7,7 @@ from sudoku_solver.sudoku import SudokuBoard
 
 class TestSudokuBoard(unittest.TestCase):
     def setUp(self) -> None:
-        self.unsolved_puzzle_1 = SudokuBoard(
+        self.unsolved_puzzle = SudokuBoard(
             [
                 [5, 3, 0, 0, 7, 0, 0, 0, 0],
                 [6, 0, 0, 1, 9, 5, 0, 0, 0],
@@ -21,7 +20,7 @@ class TestSudokuBoard(unittest.TestCase):
                 [0, 0, 0, 0, 8, 0, 0, 7, 9],
             ]
         )
-        self.solved_puzzle_1 = SudokuBoard(
+        self.solved_puzzle = SudokuBoard(
             [
                 [5, 3, 4, 6, 7, 8, 9, 1, 2],
                 [6, 7, 2, 1, 9, 5, 3, 4, 8],
@@ -34,11 +33,6 @@ class TestSudokuBoard(unittest.TestCase):
                 [3, 4, 5, 2, 8, 6, 1, 7, 9],
             ]
         )
-        self.sudoku = SudokuBoard(self.unsolved_puzzle_1)
-
-        mock_sudoku_solver = mock.MagicMock()
-        mock_sudoku_solver.solve.side_effect = lambda x: x
-        self.sudoku.solver = mock_sudoku_solver
 
         # ex1 = [
         #     ["5", "3", " ", " ", "7", " ", " ", " ", " "],
@@ -85,24 +79,24 @@ class TestSudokuBoard(unittest.TestCase):
         #     [" ", "6", " ", "9", " ", " ", " ", " ", " "],
         # ]
 
-    def test_interpret_puzzle_repr(self):
+    def test_interpret_array_repr(self):
         with self.subTest("None"):
             sudoku = SudokuBoard()
             self.assertListEqual(sudoku.tolist(), [[0] * 9] * 9)
 
         with self.subTest("str"):
-            sudoku = SudokuBoard(repr(self.unsolved_puzzle_1))
-            self.assertListEqual(sudoku.tolist(), self.unsolved_puzzle_1.tolist())
+            sudoku = SudokuBoard(repr(self.unsolved_puzzle))
+            self.assertListEqual(sudoku.tolist(), self.unsolved_puzzle.tolist())
 
         with self.subTest("list"):
-            sudoku = SudokuBoard(self.unsolved_puzzle_1.tolist())
+            sudoku = SudokuBoard(self.unsolved_puzzle.tolist())
             self.assertListEqual(
-                sudoku.array.tolist(), self.unsolved_puzzle_1.tolist()
+                sudoku.array.tolist(), self.unsolved_puzzle.tolist()
             )
 
     def test_str(self):
         self.assertEqual(
-            str(self.sudoku),
+            str(self.unsolved_puzzle),
             """+-----------------------+
 | 5 3 0 | 0 7 0 | 0 0 0 |
 | 6 0 0 | 1 9 5 | 0 0 0 |
@@ -120,7 +114,10 @@ class TestSudokuBoard(unittest.TestCase):
 
     def test_repr(self):
         self.assertEqual(
-            repr(self.sudoku), "".join(self.sudoku.array.astype(str).reshape(-1))
+            repr(self.unsolved_puzzle), "".join(self.unsolved_puzzle.array.astype(str).reshape(-1))
+        )
+        self.assertEqual(
+            repr(self.solved_puzzle), "".join(self.solved_puzzle.array.astype(str).reshape(-1))
         )
 
     def test_get_box_origin(self):
@@ -137,16 +134,16 @@ class TestSudokuBoard(unittest.TestCase):
 
     def test_check_validity(self):
         with self.subTest('correct_values'):
-            puzzle_iterator = np.nditer(self.unsolved_puzzle_1.array, order="C", flags=["multi_index"])
+            puzzle_iterator = np.nditer(self.unsolved_puzzle.array, order="C", flags=["multi_index"])
             for cell in puzzle_iterator:
                 cell_value = int(cell)
                 if cell_value:
                     continue
 
                 row, col = puzzle_iterator.multi_index
-                true_value = self.solved_puzzle_1.array[row, col]
+                true_value = self.solved_puzzle.array[row, col]
 
-                self.assertTrue(self.unsolved_puzzle_1.check_validity(row, col, true_value), f"{(row, col, int(cell_value))}")
+                self.assertTrue(self.unsolved_puzzle.check_validity(row, col, true_value), f"{(row, col, int(cell_value))}")
 
         options = set(range(1, 10))
         with self.subTest('incorrect_values'):
@@ -162,3 +159,8 @@ class TestSudokuBoard(unittest.TestCase):
 
     def test_copy(self):
         pass
+
+    def test_by_index(self):
+        sudoku = SudokuBoard(np.arange(81).reshape((9, 9)))
+        for i in range(81):
+            self.assertEqual(sudoku.by_index(i), i)

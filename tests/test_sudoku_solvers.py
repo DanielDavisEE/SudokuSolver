@@ -1,15 +1,19 @@
 import unittest
 from unittest import mock
 
-import numpy as np
-
 from sudoku_solver.sudoku import SudokuBoard
 from sudoku_solver.sudoku_solvers import (BacktrackSudokuSolver, DancingChainsSudokuSolver, SudokuSolver)
 
 
 class TestSudokuSolver(unittest.TestCase):
     def setUp(self) -> None:
-        self.solver = SudokuSolver()
+        class _SudokuSolver(SudokuSolver):
+            def solve(self, puzzle: SudokuBoard) -> SudokuBoard:
+                super().solve(puzzle)
+
+                return puzzle
+
+        self.solver = _SudokuSolver()
 
     def test_create_solved_puzzle(self):
         with mock.patch("numpy.random.shuffle", side_effect=lambda x: x):
@@ -21,8 +25,8 @@ class TestSudokuSolver(unittest.TestCase):
 
 class TestBacktrackSudokuSolver(unittest.TestCase):
     def setUp(self) -> None:
-        self.empty_puzzle = np.array([[0] * 9] * 9)
-        self.unsolved_puzzle_1 = np.array(
+        self.empty_puzzle = SudokuBoard()
+        self.unsolved_puzzle = SudokuBoard(
             [
                 [5, 3, 0, 0, 7, 0, 0, 0, 0],
                 [6, 0, 0, 1, 9, 5, 0, 0, 0],
@@ -35,7 +39,7 @@ class TestBacktrackSudokuSolver(unittest.TestCase):
                 [0, 0, 0, 0, 8, 0, 0, 7, 9],
             ]
         )
-        self.solved_puzzle_1 = np.array(
+        self.solved_puzzle = SudokuBoard(
             [
                 [5, 3, 4, 6, 7, 8, 9, 1, 2],
                 [6, 7, 2, 1, 9, 5, 3, 4, 8],
@@ -48,18 +52,20 @@ class TestBacktrackSudokuSolver(unittest.TestCase):
                 [3, 4, 5, 2, 8, 6, 1, 7, 9],
             ]
         )
-        self.sudoku = SudokuBoard()
-        self.sudoku.puzzle = self.unsolved_puzzle_1
 
         self.solver = BacktrackSudokuSolver()
 
     def test_solve(self):
-        almost_solved_puzzle = self.solved_puzzle_1.copy()
-        almost_solved_puzzle[4, 6] = 0
-        solved_puzzle = self.solver.solve(almost_solved_puzzle)
+        with self.subTest('last step'):
+            almost_solved_puzzle = self.solved_puzzle.copy()
+            almost_solved_puzzle.array[4, 6] = 0
+            solved_puzzle = self.solver.solve(almost_solved_puzzle)
 
-        self.assertTrue(self.solver._puzzle is almost_solved_puzzle)
-        self.assertTrue((solved_puzzle == self.solved_puzzle_1).all())
+            self.assertFalse(solved_puzzle is almost_solved_puzzle)
+            self.assertTrue((solved_puzzle.array == self.solved_puzzle.array).all())
+
+        with self.subTest('full solve'):
+            self.assertTrue((self.solver.solve(self.unsolved_puzzle).array == self.solved_puzzle.array).all())
 
 
 class TestDancingChainsSudokuSolver(unittest.TestCase):

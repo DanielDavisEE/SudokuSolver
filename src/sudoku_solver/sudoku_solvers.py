@@ -19,20 +19,24 @@ class SudokuSolver(ABC):
         self._solutions = set()
         self._action_list = []
 
+    @staticmethod
+    def puzzle_solved(puzzle: SudokuBoard):
+        return not (puzzle.array == 0).any()
+
     @abstractmethod
     def solve(self, puzzle: SudokuBoard) -> SudokuBoard:
-        self._puzzle = puzzle.copy()
+        pass
 
     def create_solved_puzzle(self) -> SudokuBoard:
         # Create blank board
-        _puzzle = SudokuBoard()
+        puzzle = SudokuBoard()
 
         # Randomly fill in the first layer
-        _puzzle[0, :] = np.arange(1, 10)
-        np.random.shuffle(_puzzle[0, :])
+        puzzle.array[0, :] = np.arange(1, 10)
+        np.random.shuffle(puzzle.array[0, :])
 
         # Fill in the rest of the board
-        return self.solve(_puzzle)
+        return self.solve(puzzle)
 
     def _neighbours(self, row: int, col: int):
         """
@@ -73,33 +77,30 @@ class BacktrackSudokuSolver(SudokuSolver):
     to a given puzzle. Very lightweight, but not very fast.
     """
 
-    def solve(self, puzzle: SudokuBoard):
-        """A backtracking algorithm for solving a sudoku puzzle"""
-        super().solve(puzzle)
+    def _recursive_solve(self, puzzle: SudokuBoard):
+        if self.puzzle_solved(puzzle):
+            return
 
+        # Find the next empty cell
         idx = 0
-        while (self._puzzle == 0).any():
-            row, col = idx // 9, idx % 9
+        while puzzle.by_index(idx):
+            idx += 1
+        row, col = idx // 9, idx % 9
 
-            # Find the next empty cell
-            while self._puzzle[row, col]:
-                idx += 1
-                row, col = idx // 9, idx % 9
+        for value in SudokuBoard.VALUE_OPTIONS:
+            if puzzle.check_validity(row, col, value):
+                puzzle.array[row, col] = value
+                self._recursive_solve(puzzle)
+                if self.puzzle_solved(puzzle):
+                    return
+                puzzle.array[row, col] = 0
 
-            # Find the next valid value for this cell
-            cell_value = self._puzzle[row, col] + 1
-            while cell_value <= 10 and not self._check_validity(row, col, cell_value):
-                cell_value += 1
+    def solve(self, puzzle: SudokuBoard):
+        solved_puzzle = puzzle.copy()
 
-            # Backtrack if we run out of valid options
-            if cell_value > 9:
-                self._puzzle[row, col] = 0
-                idx -= 1
-                continue
+        self._recursive_solve(solved_puzzle)
 
-            self._puzzle[row, col] = cell_value
-
-        return self._puzzle
+        return solved_puzzle
 
 
 class DancingChainsSudokuSolver(SudokuSolver):
@@ -416,3 +417,8 @@ def generate_puzzle():
     # self.log.debug('Finished _puzzle:')
     # self.log.debug(self.original_puzzle)
     # self._puzzle = self.original_puzzle.copy()
+
+
+if __name__ == '__main__':
+    solver = BacktrackSudokuSolver()
+    print(solver.solve())
