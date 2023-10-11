@@ -50,11 +50,11 @@ class SudokuBoard:
             row, col = puzzle_iterator.multi_index
 
             self.array[row, col] = 0
-            if not self.check_validity(row, col, cell_value):
+            if not self.is_valid_cell_value(row, col, cell_value):
                 raise ValueError(f"value '{cell_value}' in position {(row, col)} is invalid.")
             self.array[row, col] = cell_value
 
-    def check_validity(self, row: int, col: int, val: int):
+    def is_valid_cell_value(self, row: int, col: int, val: int):
         if (self.array[row, :] == val).any():
             return False
 
@@ -84,6 +84,38 @@ class SudokuBoard:
         if not (0 <= row < 9) or not (0 <= col < 9):
             raise ValueError(f"({row}, {col}) is not a valid coordinate.")
         return (row // 3) * 3, (col // 3) * 3
+
+    def _neighbours(self, row: int, col: int):
+        """
+        Find the neighbouring cells for a chosen cell on a Sudoku board.
+            Yield a generator of each value in the neighbours.
+
+        Args:
+            row: The row coordinate
+            col: The column coordinate
+
+        Yields:
+            tuple[int, int], int: A row, col coordinate tuple and the value at those coordinates
+        """
+        # Iterate down the column
+        for _row in range(SudokuBoard.HEIGHT):
+            if _row != row:
+                yield (_row, col), self.array[_row, col]
+
+        # Iterate across the row
+        for _col in range(SudokuBoard.WIDTH):
+            if _col != col:
+                yield (row, _col), self.array[row, _col]
+
+        # Iterate through the 3x3 box
+        box_row_origin, box_col_origin = SudokuBoard.get_box_origin(row, col)
+        for row_diff in range(SudokuBoard.BOX_HEIGHT):
+            for col_diff in range(SudokuBoard.BOX_WIDTH):
+                _row, _col = box_row_origin + row_diff, box_col_origin + col_diff
+                if (_row, _col) == (row, col):
+                    continue
+
+                yield (_row, _col), self.array[_row, _col]
 
     def __repr__(self):
         if self.array is None:

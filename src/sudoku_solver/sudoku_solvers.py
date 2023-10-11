@@ -1,5 +1,4 @@
 import logging
-import random
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -13,18 +12,17 @@ class SudokuSolver(ABC):
     def __init__(self):
         self.log = logging.getLogger(self.__class__.__name__)
 
-        # self._original_puzzle = None
-        # self._puzzle = None
+        self.rng = np.random.default_rng()
 
-        # self._solutions = set()
-        self.action_list = []
+        self._solutions = 0
+        # self.action_list = []
 
     @staticmethod
     def puzzle_solved(puzzle: SudokuBoard):
         return not (puzzle.array == 0).any()
 
     @abstractmethod
-    def solve(self, puzzle: SudokuBoard) -> SudokuBoard:
+    def solve(self, puzzle: SudokuBoard, find_all_solutions: bool = True) -> SudokuBoard:
         pass
 
     def create_solved_puzzle(self) -> SudokuBoard:
@@ -33,106 +31,51 @@ class SudokuSolver(ABC):
 
         # Randomly fill in the first layer
         puzzle.array[0, :] = np.arange(1, 10)
-        np.random.shuffle(puzzle.array[0, :])
+        self.rng.shuffle(puzzle.array[0, :])
 
         # Fill in the rest of the board
         return self.solve(puzzle)
 
-    def _neighbours(self, row: int, col: int):
-        """
-        Find the neighbouring cells for a chosen cell on a Sudoku board.
-            Yield a generator of each value in the neighbours.
+    def _multiple_solutions(self, puzzle):
+        self._solutions = 0
+        self.solve(puzzle, find_all_solutions=True)
 
-        Args:
-            row: The row coordinate
-            col: The column coordinate
-
-        Yields:
-            tuple[int, int], int: A row, col coordinate tuple and the value at those coordinates
-        """
-        # Iterate down the column
-        for _row in range(SudokuBoard.HEIGHT):
-            if _row != row:
-                yield (_row, col), self._puzzle[_row][col]
-
-        # Iterate across the row
-        for _col in range(SudokuBoard.WIDTH):
-            if _col != col:
-                yield (row, _col), self._puzzle[row][_col]
-
-        # Iterate through the 3x3 box
-        box_row_origin, box_col_origin = SudokuBoard.get_box_origin(row, col)
-        for row_diff in range(SudokuBoard.BOX_HEIGHT):
-            for col_diff in range(SudokuBoard.BOX_WIDTH):
-                _row, _col = box_row_origin + row_diff, box_col_origin + col_diff
-                if (_row, _col) == (row, col):
-                    continue
-
-                yield (_row, _col), self._puzzle[_row][_col]
-
-    # def _multiple_solutions(self):
-    #     solving = True
-    #     while solving:
-    #         solving, move = self.solve_puzzle_fast_step()
-    #         print(solving, move)
-    #
-    #     self.log.debug('Number of Solutions Found:', len(self.solutions))
-    #     # [print(x.__repr__()) for x in self.solutions]
-    #     self._action_list = []
-    #     return len(self.solutions) == 1
+        self.log.debug(f'Number of Solutions Found: {self._solutions}')
+        # self.action_list = []
+        return self._solutions > 1
 
     def generate_puzzle(self):
         puzzle_solution = self.create_solved_puzzle()
 
-        # self.log.debug('Solved _puzzle:')
-        # self.log.debug(puzzle_solution)
-        #
-        # # Remove random numbers from the board until a _puzzle with multiple solutions
-        # #    is generated.
-        # i = 0
-        # self.solve_puzzle_fast_init()
-        # self.log.debug('entering loop')
-        # while self._multiple_solutions() and i < 81:
-        #     random_row, random_col = random.randint(0, 8), random.randint(0, 8)
-        #     old_num = self._original_puzzle[random_row][random_col]
-        #
-        #     while old_num == ' ':
-        #         random_row, random_col = random.randint(0, 8), random.randint(0, 8)
-        #         old_num = self._original_puzzle[random_row][random_col]
-        #
-        #     # self.original_puzzle[random_row][random_col] = ' '
-        #     key = (int(old_num), random_row, random_col)
-        #     self.log.debug(key)
-        #
-        #     # for row in self.rows_info.keys():
-        #     # self.rows_info[row] = self.rows_info[row][0], None
-        #     # for i, row in enumerate(self.constraints_info):
-        #     # if key in row[2] or key in row[3]:
-        #     # print(i, row)
-        #     self.log.debug(i)
-        #     self.back_step(permanent=True, sub_key=(int(old_num), random_row, random_col))
-        #     self.log.debug(self.original_puzzle)
-        #     # if i == 0:
-        #     # print(self.original_puzzle)
-        #     # a1, b1, c1 = self.constraints_matrix, self.rows_info, self.constraints_info
-        #
-        #     # for i, row in enumerate(c1):
-        #     # print(i, row)
-        #
-        #     # for k, v in b1.items():
-        #     # print(k, v)
-        #     i += 1
-        #     yield random_row, random_col, ' '
-        # self.log.debug('Left loop')
-        #
-        # # Replace the most recently removed number
-        # self.original_puzzle[random_row][random_col] = old_num
-        #
-        # yield random_row, random_col, old_num
-        #
-        # self.log.debug('Finished _puzzle:')
-        # self.log.debug(self.original_puzzle)
-        # self._puzzle = self.original_puzzle.copy()
+        self.log.debug('Solved _puzzle:')
+        self.log.debug(puzzle_solution)
+
+        # Remove random numbers from the board until a puzzle with multiple solutions
+        #    is generated.
+        i = 0
+        unsolved_puzzle = puzzle_solution.copy()
+        random_row, random_col = self.rng.integers(0, 9, 2)
+
+        while not self._multiple_solutions(unsolved_puzzle):
+            while unsolved_puzzle.array[random_row, random_col] == 0:
+                random_row, random_col = self.rng.integers(0, 9, 2)
+
+            old_num = unsolved_puzzle.array[random_row, random_col]
+            unsolved_puzzle.array[random_row, random_col] = 0
+
+            self.log.debug(f"Removing {old_num} from {(random_row, random_col)}")
+
+            i += 1
+            if i >= 81:
+                raise RuntimeError('An impossible amount of numbers have been removed')
+
+        # Replace the most recently removed number
+        unsolved_puzzle.array[random_row, random_col] = old_num
+
+        self.log.debug('Finished puzzle:')
+        self.log.debug(unsolved_puzzle)
+
+        return unsolved_puzzle
 
 
 class BacktrackSudokuSolver(SudokuSolver):
@@ -141,9 +84,9 @@ class BacktrackSudokuSolver(SudokuSolver):
     to a given puzzle. Very lightweight, but not very fast.
     """
 
-    def _recursive_solve(self, puzzle: SudokuBoard):
+    def _recursive_solve(self, puzzle: SudokuBoard, find_all_solutions):
         if self.puzzle_solved(puzzle):
-            return
+            return 1
 
         # Find the next empty cell
         idx = 0
@@ -152,21 +95,23 @@ class BacktrackSudokuSolver(SudokuSolver):
         row, col = idx // 9, idx % 9
 
         for value in SudokuBoard.VALUE_OPTIONS:
-            if puzzle.check_validity(row, col, value):
+            if puzzle.is_valid_cell_value(row, col, value):
                 self.set_value(puzzle, row, col, value)
-                self._recursive_solve(puzzle)
-                if self.puzzle_solved(puzzle):
-                    return
+                if self._recursive_solve(puzzle, find_all_solutions):
+                    if find_all_solutions:
+                        self._solutions += 1
+                    else:
+                        return 1
                 self.set_value(puzzle, row, col, 0)
 
     def set_value(self, puzzle, row, col, value):
         puzzle.array[row, col] = value
-        self.action_list.append((row, col, value))
+        # self.action_list.append((row, col, value))
 
-    def solve(self, puzzle: SudokuBoard):
+    def solve(self, puzzle: SudokuBoard, find_all_solutions=False):
         solved_puzzle = puzzle.copy()
 
-        self._recursive_solve(solved_puzzle)
+        self._recursive_solve(solved_puzzle, find_all_solutions)
 
         return solved_puzzle
 
@@ -409,7 +354,7 @@ class DancingChainsSudokuSolver(SudokuSolver):
 
         if best_actions:
             if generateRandom:
-                best_action = random.choice(best_actions)
+                best_action = self.rng.choice(best_actions)
                 best_actions.remove(best_action)
             else:
                 best_action = best_actions.pop()
@@ -421,7 +366,32 @@ class DancingChainsSudokuSolver(SudokuSolver):
 
         return True, move
 
+    def generate_puzzle(self):
+        pass
+    #
+    #     # self.original_puzzle[random_row][random_col] = ' '
+    #     key = (int(old_num), random_row, random_col)
+    #     self.log.debug(key)
+    #
+    #     # for row in self.rows_info.keys():
+    #     # self.rows_info[row] = self.rows_info[row][0], None
+    #     # for i, row in enumerate(self.constraints_info):
+    #     # if key in row[2] or key in row[3]:
+    #     # print(i, row)
+    #     self.log.debug(i)
+    #     self.back_step(permanent=True, sub_key=(int(old_num), random_row, random_col))
+    #     self.log.debug(self.original_puzzle)
+    #     # if i == 0:
+    #     # print(self.original_puzzle)
+    #     # a1, b1, c1 = self.constraints_matrix, self.rows_info, self.constraints_info
+    #
+    #     # for i, row in enumerate(c1):
+    #     # print(i, row)
+    #
+    #     # for k, v in b1.items():
+    #     # print(k, v)
+
 
 if __name__ == '__main__':
     solver = BacktrackSudokuSolver()
-    print(solver.solve())
+    print(solver.generate_puzzle())

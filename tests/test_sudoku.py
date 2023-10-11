@@ -143,16 +143,16 @@ class TestSudokuBoard(unittest.TestCase):
                 row, col = puzzle_iterator.multi_index
                 true_value = self.solved_puzzle.array[row, col]
 
-                self.assertTrue(self.unsolved_puzzle.check_validity(row, col, true_value), f"{(row, col, int(cell_value))}")
+                self.assertTrue(self.unsolved_puzzle.is_valid_cell_value(row, col, true_value), f"{(row, col, int(cell_value))}")
 
         options = set(range(1, 10))
         with self.subTest('incorrect_values'):
             empty_puzzle = SudokuBoard()
             empty_puzzle.array[0, 0] = 5
 
-            self.assertFalse(empty_puzzle.check_validity(0, 8, 5), f"{(0, 8, 5)}")
-            self.assertFalse(empty_puzzle.check_validity(8, 0, 5), f"{(8, 0, 5)}")
-            self.assertFalse(empty_puzzle.check_validity(1, 1, 5), f"{(1, 1, 5)}")
+            self.assertFalse(empty_puzzle.is_valid_cell_value(0, 8, 5), f"{(0, 8, 5)}")
+            self.assertFalse(empty_puzzle.is_valid_cell_value(8, 0, 5), f"{(8, 0, 5)}")
+            self.assertFalse(empty_puzzle.is_valid_cell_value(1, 1, 5), f"{(1, 1, 5)}")
 
     def test_tolist(self):
         pass
